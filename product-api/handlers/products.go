@@ -1,10 +1,12 @@
 package handlers
 
 import (
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
+
+	protos "github.com/fzft/go_microservice/currency/protos/currency"
+	"github.com/gorilla/mux"
 )
 
 // GenericError is a generic error message returned by a server
@@ -33,6 +35,7 @@ func getProductID(r *http.Request) int {
 // Products handler for getting and updating products
 type Products struct {
 	l *log.Logger
+	cc protos.CurrencyClient
 }
 
 // ValidationError is a collection of validation error messages
@@ -41,8 +44,8 @@ type ValidationError struct {
 }
 
 // NewProducts returns a new products handler with the given logger
-func NewProducts(l *log.Logger) *Products {
-	return &Products{l}
+func NewProducts(l *log.Logger, cc protos.CurrencyClient) *Products {
+	return &Products{l, cc}
 }
 
 // KeyProduct is a key used for the Product object in the context
