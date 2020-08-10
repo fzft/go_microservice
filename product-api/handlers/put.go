@@ -15,17 +15,17 @@ import (
 
 // Update handles PUT requests to update products
 
-func (p *Products) UpdateProduct(rw http.ResponseWriter, r *http.Request) {
+func (p *Products) Update(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Add("Content-Type", "application/json")
 
-
-	p.l.Println("Handle PUT Product")
+	p.l.Debug("Handle PUT Product")
 
 	prod := r.Context().Value(KeyProduct{}).(data.Product)
 
-	p.l.Printf("Prod: %#v", prod)
-	err := data.UpdateProduct(prod)
+	p.l.Debug("Updating record id", prod.ID)
+	err := p.productDB.UpdateProduct(prod)
 	if err == data.ErrProductNotFound {
-		p.l.Println("[ERROR] product not found", err)
+		p.l.Error("product not found", "error", err)
 		rw.WriteHeader(http.StatusNotFound)
 		data.ToJSON(&GenericError{Message: "Product not found in database"}, rw)
 		return

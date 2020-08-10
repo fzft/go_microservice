@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 
-	protos "github.com/fzft/go_microservice/currency/protos/currency"
 	"github.com/fzft/go_microservice/product-api/data"
 )
 
@@ -15,15 +13,23 @@ import (
 
 // ListAll handles GET requests and returns all current products
 
-func (p *Products) GetProducts(rw http.ResponseWriter, r *http.Request) {
-	p.l.Println("Handle GET Products")
+func (p *Products) ListAll(rw http.ResponseWriter, r *http.Request) {
+	p.l.Debug("Get all records")
+	rw.Header().Add("Content-Type", "application/json")
 
+	cur := r.URL.Query().Get("currency")
 	// fetch the products from the datastore
-	lp := data.GetProducts()
-	// serialize the list to JSON
-	err := data.ToJSON(lp, rw)
+	prods, err := p.productDB.GetProducts(cur)
 	if err != nil {
-		http.Error(rw, "Unable to marshal json", http.StatusInternalServerError)
+		rw.WriteHeader(http.StatusInternalServerError)
+		data.ToJSON(&GenericError{Message: err.Error()}, rw)
+		return
+	}
+	// serialize the list to JSON
+	err = data.ToJSON(prods, rw)
+	if err != nil {
+		p.l.Error("Unable to serializing product", "error", err)
+
 	}
 }
 
@@ -35,49 +41,35 @@ func (p *Products) GetProducts(rw http.ResponseWriter, r *http.Request) {
 
 // ListSingle handles GET requests
 func (p *Products) ListSingle(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Add("Content-Type", "application/json")
+
 	id := getProductID(r)
+	cur := r.URL.Query().Get("currency")
 
-	p.l.Println("[DEBUG] get record id", id)
+	p.l.Debug("Get record id", id)
 
-	prod, err := data.GetProductByID(id)
+	prod, err := p.productDB.GetProductByID(id, cur)
 
 	switch err {
 	case nil:
 
 	case data.ErrProductNotFound:
-		p.l.Println("[ERROR] fetching product", err)
+		p.l.Error("Unable to fetch product", "error", err)
 
 		rw.WriteHeader(http.StatusNotFound)
 		data.ToJSON(&GenericError{Message: err.Error()}, rw)
 		return
 	default:
-		p.l.Println("[ERROR] fetching product", err)
+		p.l.Error("[ERROR] fetching product", err)
 
 		rw.WriteHeader(http.StatusInternalServerError)
 		data.ToJSON(&GenericError{Message: err.Error()}, rw)
 		return
 	}
 
-	// get exchange rate
-	rr := &protos.RateRequest{
-		Base:        protos.Currencies(protos.Currencies_value["EUR"]),
-		Destination: protos.Currencies(protos.Currencies_value["GBP"]),
-	}
-
-	resp, err := p.cc.GetRate(context.Background(), rr)
-	if err != nil {
-		p.l.Println("[Error] error getting new rate", err)
-		data.ToJSON(&GenericError{Message: err.Error()}, rw)
-		return
-	}
-
-	p.l.Printf("Resp %#v", resp)
-
-	prod.Price = prod.Price * resp.Rate
-
 	err = data.ToJSON(prod, rw)
 	if err != nil {
 		// we should never be here but log the error just incase
-		p.l.Println("[ERROR] serializing product", err)
+		p.l.Error("Unable to serializing product", "error", err)
 	}
 }

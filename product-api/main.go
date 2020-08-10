@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"github.com/fzft/go_microservice/product-api/data"
+	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	l := log.New(os.Stdout, "product-api", log.LstdFlags)
+	l := hclog.Default()
 	v := data.NewValidation()
 
 	conn, err := grpc.Dial("localhost:9092", grpc.WithInsecure())
@@ -31,23 +31,29 @@ func main() {
 	// create client
 	cc := protos.NewCurrencyClient(conn)
 
+	// create database instance
+	db := data.NewProductsDB(cc, l)
+
 	// create the handlers
 	//hh := handlers.NewHello(l)
 	//gh := handlers.NewGoodbye(l)
-	ph := handlers.NewProducts(l, cc)
+	ph := handlers.NewProducts(l, v, db)
 
 	// create a new serve mux and register the handlers
 	sm := mux.NewRouter()
 	getRouter := sm.Methods("GET").Subrouter()
-	getRouter.HandleFunc("/", ph.GetProducts)
-	getRouter.HandleFunc("/{id:[0-9]+}", ph.ListSingle)
+	getRouter.HandleFunc("/products", ph.ListAll).Queries("currency", "{[A-Z](3)}")
+	getRouter.HandleFunc("/products", ph.ListAll)
+
+	getRouter.HandleFunc("/products/{id:[0-9]+}", ph.ListSingle).Queries("currency", "{[A-Z](3)}")
+	getRouter.HandleFunc("/products/{id:[0-9]+}", ph.ListSingle)
 
 	putRouter := sm.Methods(http.MethodPut).Subrouter()
-	putRouter.HandleFunc("/{id:[0-9]+}", ph.UpdateProduct)
+	putRouter.HandleFunc("/products/{id:[0-9]+}", ph.Update)
 	putRouter.Use(ph.MiddlewareValidation)
 
 	postRouter := sm.Methods(http.MethodPost).Subrouter()
-	postRouter.HandleFunc("/", ph.Create)
+	postRouter.HandleFunc("/products", ph.Create)
 	postRouter.Use(ph.MiddlewareValidation)
 
 	deleteRouter := sm.Methods(http.MethodDelete).Subrouter()
@@ -67,14 +73,16 @@ func main() {
 	s := &http.Server{
 		Addr:         ":9090",
 		Handler:      ch(sm),
+		ErrorLog:     l.StandardLogger(&hclog.StandardLoggerOptions{}),
 		IdleTimeout:  120 * time.Second,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,
 	}
 	go func() {
+		l.Info("Starting server on port 9090")
 		err := s.ListenAndServe()
 		if err != nil {
-			l.Fatal(err)
+			l.Error("Error starting server", "error", err)
 		}
 	}()
 
@@ -85,7 +93,7 @@ func main() {
 
 	// Block until a signal is received.
 	sig := <-sigChan
-	l.Println("Got signal:", sig)
+	l.Info("Got signal:", sig)
 
 	// gracefully shutdown the server, waiting max 30 seconds for current operations to complete
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)

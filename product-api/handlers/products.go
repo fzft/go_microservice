@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"github.com/fzft/go_microservice/product-api/data"
-	"log"
+	"github.com/hashicorp/go-hclog"
 	"net/http"
 	"strconv"
 
-	protos "github.com/fzft/go_microservice/currency/protos/currency"
 	"github.com/gorilla/mux"
 )
 
@@ -35,9 +34,9 @@ func getProductID(r *http.Request) int {
 
 // Products handler for getting and updating products
 type Products struct {
-	l  *log.Logger
+	l  hclog.Logger
 	v  *data.Validation
-	cc protos.CurrencyClient
+	productDB *data.ProductsDB
 }
 
 // ValidationError is a collection of validation error messages
@@ -46,8 +45,8 @@ type ValidationError struct {
 }
 
 // NewProducts returns a new products handler with the given logger
-func NewProducts(l *log.Logger, v *data.Validation, cc protos.CurrencyClient) *Products {
-	return &Products{l, v, cc}
+func NewProducts(l hclog.Logger, v *data.Validation, pdb *data.ProductsDB) *Products {
+	return &Products{l, v, pdb}
 }
 
 // KeyProduct is a key used for the Product object in the context
