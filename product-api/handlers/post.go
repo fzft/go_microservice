@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/fzft/go_microservice/data"
+	"github.com/fzft/go_microservice/product-api/data"
 	"net/http"
 )
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/fzft/go_microservice/product-api/data"
 	"google.golang.org/grpc"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 
 func main() {
 	l := log.New(os.Stdout, "product-api", log.LstdFlags)
+	v := data.NewValidation()
 
 	conn, err := grpc.Dial("localhost:9092", grpc.WithInsecure())
 	if err != nil {

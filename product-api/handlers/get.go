@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	protos "github.com/fzft/go_microservice/currency/protos/currency"
-	"github.com/fzft/go_microservice/data"
+	"github.com/fzft/go_microservice/product-api/data"
 )
 
 // swagger:route GET /products products listProducts

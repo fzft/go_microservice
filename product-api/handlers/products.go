@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/fzft/go_microservice/product-api/data"
 	"log"
 	"net/http"
 	"strconv"
@@ -34,7 +35,8 @@ func getProductID(r *http.Request) int {
 
 // Products handler for getting and updating products
 type Products struct {
-	l *log.Logger
+	l  *log.Logger
+	v  *data.Validation
 	cc protos.CurrencyClient
 }
 
@@ -44,8 +46,8 @@ type ValidationError struct {
 }
 
 // NewProducts returns a new products handler with the given logger
-func NewProducts(l *log.Logger, cc protos.CurrencyClient) *Products {
-	return &Products{l, cc}
+func NewProducts(l *log.Logger, v *data.Validation, cc protos.CurrencyClient) *Products {
+	return &Products{l, v, cc}
 }
 
 // KeyProduct is a key used for the Product object in the context

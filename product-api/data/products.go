@@ -2,8 +2,6 @@ package data
 
 import (
 	"fmt"
-	"github.com/go-playground/validator"
-	"regexp"
 	"time"
 )
 
@@ -19,22 +17,6 @@ type Product struct {
 }
 
 type Products []*Product
-
-func (p *Product) Validate() error {
-	validate := validator.New()
-	validate.RegisterValidation("sku", validateSKU)
-	return validate.Struct(p)
-}
-func validateSKU(fl validator.FieldLevel) bool {
-	// sku is of format abc-asd-asd
-	reg := regexp.MustCompile("[a-z]+-[a-z]+[a-z]+")
-	matches := reg.FindAllString(fl.Field().String(), -1)
-	if len(matches) != 1 {
-		return false
-	}
-
-	return true
-}
 
 func GetProducts() Products {
 	return productList
