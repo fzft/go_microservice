@@ -5,6 +5,8 @@ import (
 	"fmt"
 	protos "github.com/fzft/go_microservice/currency/protos/currency"
 	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 )
 
@@ -24,10 +26,42 @@ type Products []*Product
 type ProductsDB struct {
 	currency protos.CurrencyClient
 	log      hclog.Logger
+	rates    map[string]float64
+	client   protos.Currency_SubscribeRatesClient
 }
 
 func NewProductsDB(c protos.CurrencyClient, l hclog.Logger) *ProductsDB {
-	return &ProductsDB{c, l}
+	pb := &ProductsDB{c, l, make(map[string]float64), nil}
+	go pb.handleUpdates()
+	return pb
+}
+
+func (p *ProductsDB) handleUpdates() {
+	sub, err := p.currency.SubscribeRates(context.Background())
+	if err != nil {
+		p.log.Error("Unable to subscribe for rates", "error", err)
+	}
+
+	p.client = sub
+
+	for {
+		rr, err := sub.Recv()
+		if grpcError := rr.GetError(); grpcError != nil {
+			p.log.Error("Error subscribing for rates", "error", grpcError.GetMessage())
+			continue
+		}
+
+		if resp := rr.GetRateResponse(); resp != nil {
+			p.log.Info("Received updated rate from server", "dest", resp.GetDestination().String())
+			if err != nil {
+				p.log.Error("Error receiving message", "error", err)
+				return
+			}
+			p.rates[resp.GetDestination().String()] = resp.Rate
+		}
+
+	}
+
 }
 
 func (p *ProductsDB) GetProducts(currency string) (Products, error) {
@@ -130,13 +164,31 @@ func getNextID() int {
 }
 
 func (p *ProductsDB) getRate(destination string) (float64, error) {
+	//if cached return
+	//if r, ok := p.rates[destination]; ok {
+	//	return r, nil
+	//}
+
 	// get exchange rate
 	rr := &protos.RateRequest{
 		Base:        protos.Currencies(protos.Currencies_value["EUR"]),
 		Destination: protos.Currencies(protos.Currencies_value[destination]),
 	}
-
+	// get initial rate
 	resp, err := p.currency.GetRate(context.Background(), rr)
+	if err != nil {
+		if grpcError, ok := status.FromError(err); ok {
+			if grpcError.Code() == codes.InvalidArgument {
+				return -1, fmt.Errorf("Unable to retreive exchange rate from currency service: %s", grpcError.Message())
+			}
+		}
+		return -1, err
+	}
+	p.rates[destination] = resp.Rate // update cache
+
+	// subscribe for updates
+	p.client.Send(rr)
+
 	p.log.Info("resp.Rate", resp.Rate)
 	return resp.Rate, err
 }
