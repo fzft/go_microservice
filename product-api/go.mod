@@ -16,3 +16,4 @@ require (
 )
 
 replace github.com/fzft/go_microservice/currency => ../currency
+
